@@ -64,11 +64,16 @@ erlang_cluster_start() {
     fi
 }
 
+erlang_cluster_stop() {
+    /usr/local/bin/escript ${erlang_cluster_path}/stop-node "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie
+}
+
 case "$1" in
 	'start')
 		erlang_cluster_start
 		;;
 	'stop')
+        erlang_cluster_stop
 		;;
 	'restart')
 		;;

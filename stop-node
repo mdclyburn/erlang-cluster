@@ -1,0 +1,23 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -hidden
+
+% This solution is sub-optimal.
+main([Longname, Cookie]) ->
+    case net_kernel:start([list_to_atom("localrc"), longnames]) of
+        {ok, _} -> erlang:set_cookie(node(), list_to_atom(Cookie)),
+                   Target = list_to_atom(Longname),
+                   case net_kernel:connect(Target) of
+                       true -> io:format("telling ~s to stop...~n", [Target]),
+                               rpc:call(Target, init, stop, []),
+                               halt(0);
+                       false -> io:format("not running~n"),
+                                halt(0)
+                   end;
+        E = {error, _} -> io:format("Couldn't start distributed mode. (~w)~n", [E]),
+                          halt(1)
+    end;
+
+main(_) ->
+    io:format("Usage: stop-node <long name> <cookie>~n"),
+    halt(1).
