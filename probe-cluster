@@ -1,0 +1,50 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -hidden
+
+main([Name, Cookie, FilePath]) ->
+    case net_kernel:start([list_to_atom(Name), longnames]) of
+        {ok, _} -> erlang:set_cookie(node(), list_to_atom(Cookie)),
+                   OnlineNodes = find_valid_node(get_node_list(file:open(FilePath, [read]))),
+                   lists:foreach(fun (Node) -> io:format("~s~n", [Node]) end, OnlineNodes),
+                   halt(0);
+        E = {error, _} -> error_out("Couldn't start distributed mode. (~w)~n", [E])
+    end;
+
+main(_) ->
+    io:format("Usage: join-cluster <name> <cookie> <nodes file>~n"),
+    halt(1).
+
+get_node_list({error, Reason}) -> error_out("Failed to open ~s: ~s~n", [Reason]);
+get_node_list({ok, File}) -> get_node_list(File, []).
+
+get_node_list(File, Lines) ->
+    case file:read_line(File) of
+        {ok, Line} -> get_node_list(File, [lists:droplast(Line)|Lines]); % get rid of the newline
+        eof -> Lines;
+        E = {error, _} -> error_out("There was a problem while reading the nodes list: ~w", [E])
+    end.
+
+find_valid_node(Nodes) ->
+    find_valid_node(lists:filter(fun (N) -> not_this_node(N) end, Nodes), [], []).
+
+find_valid_node([], Successful, _) -> Successful;
+find_valid_node([Current|Untried], Successful, Failed) ->
+    case net_kernel:connect(list_to_atom(get_node_name() ++ "@" ++ Current)) of
+       true -> find_valid_node(Untried, [Current|Successful], Failed);
+       false -> find_valid_node(Untried, Successful, [Current|Failed])
+    end.
+
+% Returns true if the first part of the FQDN matches the hostname.
+% Could be improved to match the full hostname...
+not_this_node(Name) ->
+    {ok, lists:takewhile(fun (C) -> C /= $. end, Name) } % drop everything after the first .
+        /= inet:gethostname().
+
+get_node_name() ->
+    lists:takewhile(fun (C) -> C /= $@ end,
+                    atom_to_list(node())).
+
+error_out(FormatString, Args) ->
+    io:format(standard_error, FormatString, Args),
+    halt(1).
