@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+
+# PROVIDE: erlang_cluster
+# REQUIRE: NETWORKING
+
+# Start up an Erlang VM and connect it to a cluster.
+
+name='erlang_cluster'
+rcvar='erlang_cluster_enable erlang_cluster_name erlang_cluster_cookie erlang_cluster_path'
+
+# erlang_cluster_enable
+#    Enables the execution of this script.
+#
+# erlang_cluster_name
+#    The name of the Erlang cluster to connect to.
+#
+# erlang_cluster_cookie
+#    Cookie of the cluster
+#
+# erlang_cluster_path
+#    Path to the common cluster files.
+
+. /etc/rc.subr
+
+load_rc_config $name
+
+erlang_cluster_start() {
+	if [ ! -e "${erlang_cluster_path}/nodes" ]
+	then
+		printf "error: nodes file does not exist\n"
+		exit 1
+	fi
+
+    if [ -z "$erlang_cluster_cookie" ]
+    then
+        printf "error: the cluster cookie has not been set (erlang_cluster_cookie)\n"
+        exit 1
+    fi
+
+    if [ -z "$erlang_cluster_name" ]
+    then
+        printf "error: the cluster name has not been set (erlang_cluster_name)\n"
+        exit 1
+    fi
+
+    # Look for nodes already up.
+    available_nodes="$(/usr/local/bin/escript ${erlang_cluster_path}/probe-cluster ${erlang_cluster_name} ${erlang_cluster_cookie} ${erlang_cluster_path}/nodes)"
+    if [ -n "$available_nodes" ]
+    then
+        for node in $available_nodes
+        do
+            printf "Joining with join %s.\n" "$node"
+            daemon /usr/local/bin/erl \
+                   -detached \
+                   -setcookie $erlang_cluster_cookie \
+                   -name "${erlang_cluster_name}@$(hostname)" \
+                   -eval "true = net_kernel:connect_node('${erlang_cluster_name}@${node}')."
+
+            # TODO: check to see if joining was successful.
+        done
+    else
+        printf "No other nodes available...\n"
+    fi
+}
+
+case "$1" in
+	'start')
+		erlang_cluster_start
+		;;
+	'stop')
+		;;
+	'restart')
+		;;
+	'status')
+		;;
+	'describe')
+		;;
+	'extracommands')
+		;;
+	'poll')
+		;;
+	'enabled')
+		;;
+	'rcvar')
+		;;
+esac
