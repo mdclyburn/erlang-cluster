@@ -1,14 +1,16 @@
 #!/bin/sh
 #
-
-# PROVIDE: erlang_cluster
-# REQUIRE: NETWORKING
-
 # Start up an Erlang VM and connect it to a cluster.
 
-name='erlang_cluster'
-rcvar='erlang_cluster_enable erlang_cluster_name erlang_cluster_cookie erlang_cluster_path'
+# REQUIRE: LOGIN epmd
+# PROVIDE: erlang_cluster
+# BEFORE:
+# KEYWORD:
 
+
+. /etc/rc.subr
+
+# Variables
 # erlang_cluster_enable
 #    Enables the execution of this script.
 #
@@ -21,9 +23,10 @@ rcvar='erlang_cluster_enable erlang_cluster_name erlang_cluster_cookie erlang_cl
 # erlang_cluster_path
 #    Path to the common cluster files.
 
-. /etc/rc.subr
-
-load_rc_config $name
+name='erlang_cluster'
+rcvar='erlang_cluster_enable'
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
 
 erlang_cluster_start() {
 	if [ ! -e "${erlang_cluster_path}/nodes" ]
@@ -50,17 +53,24 @@ erlang_cluster_start() {
     then
         for node in $available_nodes
         do
-            printf "Joining with join %s.\n" "$node"
+            printf "Joining with %s.\n" "$node"
             daemon /usr/local/bin/erl \
                    -detached \
                    -setcookie $erlang_cluster_cookie \
                    -name "${erlang_cluster_name}@$(hostname)" \
+				   -start_epmd false \
                    -eval "true = net_kernel:connect_node('${erlang_cluster_name}@${node}')."
 
             # TODO: check to see if joining was successful.
+			break
         done
     else
-        printf "No other nodes available...\n"
+        printf "First node; starting cluster.\n"
+        daemon /usr/local/bin/erl \
+               -detached \
+               -setcookie $erlang_cluster_cookie \
+               -name "${erlang_cluster_name}@$(hostname)" \
+			   -start_epmd false
     fi
 }
 
@@ -68,25 +78,5 @@ erlang_cluster_stop() {
     /usr/local/bin/escript ${erlang_cluster_path}/stop-node "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie
 }
 
-case "$1" in
-	'start')
-		erlang_cluster_start
-		;;
-	'stop')
-        erlang_cluster_stop
-		;;
-	'restart')
-		;;
-	'status')
-		;;
-	'describe')
-		;;
-	'extracommands')
-		;;
-	'poll')
-		;;
-	'enabled')
-		;;
-	'rcvar')
-		;;
-esac
+load_rc_config $name
+run_rc_command "$1"
