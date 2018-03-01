@@ -1,0 +1,24 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -hidden
+
+% Tells whether a node is running or not.
+% Almost a complete copy-paste of stop-node.
+% Like stop-node, this script will work for any node it can connect to.
+main([Longname, Cookie]) ->
+    case net_kernel:start([list_to_atom("localrc"), longnames]) of
+        {ok, _} -> erlang:set_cookie(node(), list_to_atom(Cookie)),
+                   Target = list_to_atom(Longname),
+                   case net_kernel:connect(Target) of
+                       true -> io:format("~s is currently running~n", [Target]),
+                               halt(0);
+                       false -> io:format("~s in not running~n", [Target]),
+                                halt(0)
+                   end;
+        E = {error, _} -> io:format("Couldn't start distributed mode. (~w)~n", [E]),
+                          halt(1)
+    end;
+
+main(_) ->
+    io:format("Usage: get-node-status <long name> <cookie>~n"),
+    halt(1).

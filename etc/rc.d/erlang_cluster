@@ -25,6 +25,7 @@
 
 name='erlang_cluster'
 rcvar='erlang_cluster_enable'
+
 start_cmd="${name}_start"
 stop_cmd="${name}_stop"
 
@@ -78,5 +79,17 @@ erlang_cluster_stop() {
     /usr/local/bin/escript ${erlang_cluster_path}/stop-node "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie
 }
 
+erlang_cluster_status() {
+	/usr/local/bin/escript ${erlang_cluster_path}/get-node-status "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie
+}
+
 load_rc_config $name
-run_rc_command "$1"
+
+case "$1" in
+	'status')
+		erlang_cluster_status
+		;;
+	*)
+		run_rc_command "$1"
+		;;
+esac
