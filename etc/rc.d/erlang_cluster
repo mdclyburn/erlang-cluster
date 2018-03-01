@@ -55,7 +55,8 @@ erlang_cluster_start() {
         for node in $available_nodes
         do
             printf "Joining with %s.\n" "$node"
-            daemon /usr/local/bin/erl \
+            daemon -u erlanger \
+	               /usr/local/bin/erl \
                    -detached \
                    -setcookie $erlang_cluster_cookie \
                    -name "${erlang_cluster_name}@$(hostname)" \
@@ -67,7 +68,8 @@ erlang_cluster_start() {
         done
     else
         printf "First node; starting cluster.\n"
-        daemon /usr/local/bin/erl \
+        daemon -u erlanger \
+               /usr/local/bin/erl \
                -detached \
                -setcookie $erlang_cluster_cookie \
                -name "${erlang_cluster_name}@$(hostname)" \
