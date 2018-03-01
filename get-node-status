@@ -12,8 +12,8 @@ main([Longname, Cookie]) ->
                    case net_kernel:connect(Target) of
                        true -> io:format("~s is currently running~n", [Target]),
                                halt(0);
-                       false -> io:format("~s in not running~n", [Target]),
-                                halt(0)
+                       false -> io:format("~s is not running~n", [Target]),
+                                halt(1)
                    end;
         E = {error, _} -> io:format("Couldn't start distributed mode. (~w)~n", [E]),
                           halt(1)

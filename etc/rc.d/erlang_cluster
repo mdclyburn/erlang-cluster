@@ -48,6 +48,15 @@ erlang_cluster_start() {
         exit 1
     fi
 
+	/usr/local/bin/escript ${erlang_cluster_path}/get-node-status "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie >/dev/null 2>&1
+	if [ "$?" = "0" ]
+	then
+		printf "%s is already running\n" "${erlang_cluster_name}@$(hostname)"
+		exit 0
+	else
+		printf "Starting node...\n"
+	fi
+
     # Look for nodes already up.
     available_nodes="$(/usr/local/bin/escript ${erlang_cluster_path}/probe-cluster ${erlang_cluster_name} ${erlang_cluster_cookie} ${erlang_cluster_path}/nodes)"
     if [ -n "$available_nodes" ]
@@ -83,9 +92,12 @@ erlang_cluster_stop() {
 
 erlang_cluster_status() {
 	/usr/local/bin/escript ${erlang_cluster_path}/get-node-status "${erlang_cluster_name}@$(hostname)" $erlang_cluster_cookie
+
+	exit $?
 }
 
 load_rc_config $name
+: ${erlang_cluster_enable:="NO"}
 
 case "$1" in
 	'status')
