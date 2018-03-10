@@ -1,6 +1,12 @@
 -module(ecs_influx).
 
--export([write/3]).
+-export([new_measurement/2,
+         new_measurement/3,
+         add_tag/3,
+         write/3,
+         write_all/3]).
+
+-compile(export_all).
 
 % ===== Public
 
@@ -13,15 +19,19 @@ add_tag(Name, Value, {MeasurementName, MeasurementValue, Tags}) when is_list(Nam
     {MeasurementName, MeasurementValue, [{Name, Value}|Tags]}.
 
 % Send a measurement to the 'ecs' database.
+% Actually just calls write_all/3, but same effect.
+write(Measurement, Uri, Authorization) -> write_all([Measurement], Uri, Authorization).
+
+% Sends measurements to the 'ecs' database.
 % Returns ok upon success, {error, _} upon failure.
-write(Measurement, Uri, Authorization) ->
+write_all(Measurements, Uri, Authorization) when is_list(Measurements) ->
     case
         httpc:request(
           post,
           {Uri ++ "/write?db=ecs",
            [{"Authorization", "Basic " ++ Authorization}],
            "text/plain",
-           measurement_to_string(Measurement)},
+           lists:flatten(lists:join(io_lib:nl(), lists:map(fun measurement_to_string/1, Measurements)))},
           [{timeout, 500}],
           [])
     of
