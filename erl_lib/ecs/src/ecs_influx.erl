@@ -6,8 +6,6 @@
          write/3,
          write_all/3]).
 
--compile(export_all).
-
 % ===== Public
 
 % Create a new Influx measurement.
