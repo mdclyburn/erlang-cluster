@@ -14,6 +14,13 @@ init(_) ->
          period => 60},
 
        [
+        #{id => statistics,
+          start => {ecs_statistics, start_link, []},
+          restart => permanent,
+          shutdown => 2000,
+          type => worker,
+          modules => [ecs_statistics]},
+
         #{id => connectivity,
           start => {ecs_connectivity, start_link, []},
           restart => permanent,

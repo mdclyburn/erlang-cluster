@@ -4,6 +4,7 @@
   {mod, {ecs, []}},
   {modules, [ecs,
              ecs_master,
-             ecs_connectivity]},
-  {applications, []}
+             ecs_connectivity,
+			 ecs_statistics]},
+  {applications, [ssl]}
  ]}.
