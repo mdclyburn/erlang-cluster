@@ -76,7 +76,8 @@ setup_timer() ->
 get_forwarding_info() ->
     case application:get_env(statistics_forwarding) of
         {ok, {Method, Options}} -> get_forwarding_info(Method, dict:from_list(Options));
-        {error, _} -> throw(bad_statf_config)
+        {error, _} -> throw(bad_statf_config);
+        _ -> none
     end.
 get_forwarding_info(influx, Options) ->
     {influx,
