@@ -26,8 +26,8 @@ reload_nodes() -> gen_server:cast(?MODULE, reload).
 
 init(_) ->
     io:format("Connectivity service started.~n"),
-    {ok, Nodes} = load_node_list(),
-    ok = reconnect(Nodes),
+    Nodes = load_node_list(),
+    reconnect(Nodes),
     {ok, Nodes, generate_timeout()}.
 
 terminate(Reason, _) ->
@@ -61,37 +61,31 @@ code_change(_, Data, _) -> {ok, Data}.
 % Load all nodes listed in the nodes file.
 load_node_list() ->
     case application:get_env(nodes_file) of
-        {ok, Path} -> load_node_list(Path)
+        {ok, Path} -> lists:delete(erlang:node(), load_node_list(Path))
     end.
 load_node_list(Path) ->
     case file:open(Path, [read]) of
-        {ok, File} -> {ok, load_node_list(File, [])};
+        {ok, File} -> load_node_list(File, []);
         E = {error, _} -> E
     end.
 load_node_list(File, Nodes) ->
     case file:read_line(File) of
-        {ok, Line} -> load_node_list(File, [lists:droplast(Line)|Nodes]);
+        {ok, Line} -> load_node_list(File, [hostname_to_node(ecs_util:name(), lists:droplast(Line))|Nodes]);
         eof -> Nodes
     end.
 
 % Attempt to connect to nodes that are listed in the nodes file but are not
 % currently connected. This function recognizes that multiple nodes may be
 % connected to with a single net_kernel:connect.
-reconnect(Known) -> reconnect(
-                      lists:subtract(
-                        lists:delete(ecs_util:host(), Known),
-                        lists:map(
-                          fun (Host) -> hostname_to_node(ecs_util:name(), erlang:atom_to_list(Host)) end,
-                          erlang:nodes(connected))),
-                      0).
-reconnect([], ConnectionsMade) -> ecs_statistics:record("successful_reconnects", ConnectionsMade), ok;
+reconnect(Known) -> reconnect(lists:subtract(Known, nodes(connected)), 0).
+reconnect([], ConnectionsMade) -> ecs_statistics:record("connects_per_reconnect", ConnectionsMade), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
-    case net_kernel:connect(hostname_to_node(ecs_util:name(), UnconnectedNode)) of
+    case net_kernel:connect(UnconnectedNode) of
         true ->
-            io:format("Connectivity: Connected to ~s.~n", [UnconnectedNode]),
-            reconnect(lists:subtract(Rest, nodes(connected)), ConnectionsMade + 1);
+            timer:sleep(1000),
+            reconnect(lists:subtract(Rest, erlang:nodes(connected)),
+                      ConnectionsMade + 1);
         false ->
-            io:format("Connectivity: Connect to ~s failed.~n", [UnconnectedNode]),
             reconnect(Rest, ConnectionsMade)
     end.
 
