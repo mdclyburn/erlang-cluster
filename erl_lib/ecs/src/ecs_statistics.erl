@@ -1,7 +1,8 @@
 -module(ecs_statistics).
 -behavior(gen_server).
 
--export([start_link/0]).
+-export([start_link/0,
+         record/2]).
 -export([init/1,
          terminate/2,
          handle_call/3,
@@ -9,9 +10,14 @@
          handle_info/2,
          code_change/3]).
 
--define(FORWARD_DELAY, 1000).
+-define(FORWARD_DELAY, 10 * 1000).
+
+% ===== Public
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+% Report a statistic.
+record(Name, Value) when is_list(Name) -> gen_server:cast(?MODULE, {add, new_stat(Name, Value)}).
 
 % ===== gen_server
 
@@ -31,16 +37,17 @@ terminate(Reason, _) -> io:format("Statistics forwarder stopping: ~w.~n", [Reaso
 
 handle_call(_, _, Data) -> {reply, unknown, Data}.
 
+handle_cast({add, Stat}, Stats) -> {noreply, [Stat|Stats]};
 handle_cast(_, Data) -> {noreply, Data}.
 
 handle_info(timeout, {ForwardingInfo, Stats}) ->
-    case forward_data(Stats, ForwardingInfo) of
+    case forward_data(add_basic(Stats), ForwardingInfo) of
         ok -> {noreply, {ForwardingInfo, []}, ?FORWARD_DELAY};
 
-        {error, {temporary, Message}} ->
+        {error, {transient, Message}} ->
             io:format("Failed to forward data: ~s.~n", [Message]),
             {noreply, {ForwardingInfo, Stats, ?FORWARD_DELAY}};
-        {error, {transient, Message}} ->
+        {error, {permanent, Message}} ->
             io:format("Failed to forward data: ~s.~n", [Message]),
             {stop, fatal_error}
     end;
@@ -60,15 +67,16 @@ get_forwarding_info(influx, Options) ->
      dict:fetch(uri, Options),
      base64:encode_to_string(dict:fetch(username, Options) ++ ":" ++ dict:fetch(password, Options))}.
 
-forward_data(Measurements, {influx, Uri, Authorization}) ->
-    case ecs_influx:write_all(add_basic(influx, Measurements), Uri, Authorization) of
+new_stat(Name, Value) -> {Name, Value, erlang:system_time()}.
+
+forward_data(Stats, {influx, Uri, Authorization}) ->
+    case ecs_influx:write(Stats, Uri, Authorization) of
         ok -> ok;
         {error, 401} -> {error, {permanent, "bad authentication credentials"}};
         {error, Code} -> {error, {transient, io_lib:format("HTTP ~b", [Code])}}
     end.
 
-
 % Add common data measurements.
-add_basic(influx, Measurements) ->
-    Measurements ++
-        [ecs_influx:new_measurement("process_count", erlang:length(erlang:processes()))].
+add_basic(Stats) ->
+    Stats ++
+        [new_stat("process_count", erlang:length(erlang:processes()))].
