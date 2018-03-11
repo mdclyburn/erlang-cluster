@@ -19,13 +19,16 @@ start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 % Reload the node list from file.
 reload_nodes() -> gen_server:cast(?MODULE, reload).
 
+% Force a reconnect to happen.
+% This will regenerate a new timeout.
+
 % ===== gen_server Calls
 
 init(_) ->
     io:format("Connectivity service started.~n"),
-    case load_node_list() of
-        {ok, Nodes} -> {ok, Nodes, generate_timeout()}
-    end.
+    {ok, Nodes} = load_node_list(),
+    ok = reconnect(Nodes),
+    {ok, Nodes, generate_timeout()}.
 
 terminate(Reason, _) ->
     io:format("Connectivity service stopping: ~w.~n", [Reason]).
@@ -47,10 +50,8 @@ handle_cast(reload, Nodes) ->
 handle_cast(_, Data) -> {reply, unknown, Data}.
 
 handle_info(timeout, Nodes) ->
-    case reconnect(Nodes) of
-        {ok, _NewConnections} ->
-            {noreply, Nodes, generate_timeout()}
-    end;
+    reconnect(Nodes),
+    {noreply, Nodes, generate_timeout()};
 handle_info(_, Data) -> {reply, unknown, Data}.
 
 code_change(_, Data, _) -> {ok, Data}.
@@ -78,18 +79,19 @@ load_node_list(File, Nodes) ->
 % connected to with a single net_kernel:connect.
 reconnect(Known) -> reconnect(
                       lists:subtract(
-                        Known,
+                        lists:delete(ecs_util:host(), Known),
                         lists:map(
                           fun (Host) -> hostname_to_node(ecs_util:name(), erlang:atom_to_list(Host)) end,
                           erlang:nodes(connected))),
                       0).
-reconnect([], ConnectionsMade) -> {ok, ConnectionsMade};
+reconnect([], ConnectionsMade) -> ecs_statistics:record("successful_reconnects", ConnectionsMade), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
     case net_kernel:connect(hostname_to_node(ecs_util:name(), UnconnectedNode)) of
         true ->
             io:format("Connectivity: Connected to ~s.~n", [UnconnectedNode]),
             reconnect(lists:subtract(Rest, nodes(connected)), ConnectionsMade + 1);
         false ->
+            io:format("Connectivity: Connect to ~s failed.~n", [UnconnectedNode]),
             reconnect(Rest, ConnectionsMade)
     end.
 

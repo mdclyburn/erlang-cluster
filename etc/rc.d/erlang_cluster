@@ -57,35 +57,17 @@ erlang_cluster_start() {
 		printf "Starting node...\n"
 	fi
 
-    # Look for nodes already up.
-    available_nodes="$(/usr/local/bin/escript ${erlang_cluster_path}/probe-cluster ${erlang_cluster_name} ${erlang_cluster_cookie} ${erlang_cluster_path}/nodes)"
-    if [ -n "$available_nodes" ]
-    then
-        for node in $available_nodes
-        do
-            printf "Joining with %s.\n" "$node"
-            daemon -u erlanger \
-	               /usr/local/bin/erl \
-                   -detached \
-                   -setcookie $erlang_cluster_cookie \
-                   -name "${erlang_cluster_name}@$(hostname)" \
-				   -start_epmd false \
-                   -pa "${erlang_cluster_path}/erl_lib" \
-                   -eval "true = net_kernel:connect_node('${erlang_cluster_name}@${node}')."
+    daemon -u erlanger \
+	       /usr/local/bin/erl \
+           -detached \
+           -setcookie $erlang_cluster_cookie \
+           -name "${erlang_cluster_name}@$(hostname)" \
+		   -start_epmd false \
+           -pa ${erlang_cluster_path}/erl_lib/*/ebin \
+           -eval "{ok, _} = application:ensure_all_started(ecs)." \
+		   -config ${erlang_cluster_path}/cluster.config
 
             # TODO: check to see if joining was successful.
-			break
-        done
-    else
-        printf "First node; starting cluster.\n"
-        daemon -u erlanger \
-               /usr/local/bin/erl \
-               -detached \
-               -setcookie $erlang_cluster_cookie \
-               -name "${erlang_cluster_name}@$(hostname)" \
-			   -start_epmd false \
-               -pa "${erlang_cluster_path}/erl_lib"
-    fi
 }
 
 erlang_cluster_stop() {
