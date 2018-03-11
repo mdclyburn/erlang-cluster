@@ -5,6 +5,7 @@
   {modules, [ecs,
              ecs_master,
              ecs_connectivity,
+			 ecs_influx,
 			 ecs_statistics]},
   {applications, [ssl]}
  ]}.

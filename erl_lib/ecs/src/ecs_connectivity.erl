@@ -80,21 +80,18 @@ reconnect(Known) -> reconnect(
                       lists:subtract(
                         Known,
                         lists:map(
-                          fun (Host) -> hostname_to_node(name(), erlang:atom_to_list(Host)) end,
+                          fun (Host) -> hostname_to_node(ecs_util:name(), erlang:atom_to_list(Host)) end,
                           erlang:nodes(connected))),
                       0).
 reconnect([], ConnectionsMade) -> {ok, ConnectionsMade};
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
-    case net_kernel:connect(hostname_to_node(name(), UnconnectedNode)) of
+    case net_kernel:connect(hostname_to_node(ecs_util:name(), UnconnectedNode)) of
         true ->
             io:format("Connectivity: Connected to ~s.~n", [UnconnectedNode]),
             reconnect(lists:subtract(Rest, nodes(connected)), ConnectionsMade + 1);
         false ->
             reconnect(Rest, ConnectionsMade)
     end.
-
-% Returns the name of the node.
-name() -> lists:takewhile(fun (C) -> C /= $@ end, erlang:atom_to_list(node())).
 
 % Prepends a node Name to the Host and returns it as an atom.
 hostname_to_node(Name, Host) -> erlang:list_to_atom(Name ++ "@" ++ Host).

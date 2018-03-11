@@ -22,6 +22,7 @@ write(Measurement, Uri, Authorization) -> write_all([Measurement], Uri, Authoriz
 
 % Sends measurements to the 'ecs' database.
 % Returns ok upon success, {error, _} upon failure.
+write_all([], _, _) -> ok;
 write_all(Measurements, Uri, Authorization) when is_list(Measurements) ->
     case
         httpc:request(
@@ -29,11 +30,11 @@ write_all(Measurements, Uri, Authorization) when is_list(Measurements) ->
           {Uri ++ "/write?db=ecs",
            [{"Authorization", "Basic " ++ Authorization}],
            "text/plain",
-           lists:flatten(lists:join(io_lib:nl(), lists:map(fun measurement_to_string/1, Measurements)))},
-          [{timeout, 500}],
+           lists:flatten(lists:join(io_lib:nl(), lists:map(fun (M) -> measurement_to_string(add_id_tags(M)) end, Measurements)))},
+          [{timeout, 1000}],
           [])
     of
-        {ok, _} -> ok;
+        {ok, Response} -> map_response(Response);
         E = {error, _} -> E
     end.
 
@@ -51,3 +52,20 @@ measurement_to_string({Name, Value, Tags}) ->
                erlang:is_float(Value) -> erlang:float_to_list(Value);
                erlang:is_integer(Value) -> erlang:integer_to_list(Value)
            end.
+
+% Add information to identify the node measurements are taken from.
+add_id_tags(Measurement) ->
+    add_id_tags(Measurement,
+                [{"node_name", ecs_util:name()},
+                 {"node_host", ecs_util:host()},
+                 {"node", erlang:atom_to_list(erlang:node())}]).
+
+add_id_tags(Measurement, []) -> Measurement;
+add_id_tags(Measurement, [{N, V}|Rest]) -> add_id_tags(add_tag(N, V, Measurement), Rest).
+
+% Translates an HTTP response to an ok or error.
+map_response({{_, Code, _}, _, _}) ->
+    if
+        Code >= 200, Code =< 299 -> ok;
+        true -> {error, Code}
+    end.
