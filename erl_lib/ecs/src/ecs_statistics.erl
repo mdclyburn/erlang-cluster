@@ -10,7 +10,7 @@
          handle_info/2,
          code_change/3]).
 
--define(FORWARD_DELAY, 10 * 1000).
+-define(FORWARD_DELAY, 10000).
 
 % ===== Public
 
@@ -27,35 +27,51 @@ init(_) ->
     case get_forwarding_info() of
         ForwardingInfo = {influx, Uri, _} ->
             io:format("Data will be forwarded to Influx (~s).~n", [Uri]),
-            {ok, {ForwardingInfo, []}, ?FORWARD_DELAY};
+            {ok, create_data(ForwardingInfo)};
         none ->
             io:format("No data will be forwarded.~n"),
-            {ok, nil, ?FORWARD_DELAY}
+            {ok, nil}
     end.
 
 terminate(Reason, _) -> io:format("Statistics forwarder stopping: ~w.~n", [Reason]).
 
-handle_call(_, _, Data) -> {reply, unknown, Data}.
+handle_call(Request, _, Data) -> io:format("Unhandled call: ~s.~n", [Request]), {reply, unknown, Data}.
 
-handle_cast({add, Stat}, Stats) -> {noreply, [Stat|Stats]};
-handle_cast(_, Data) -> {noreply, Data}.
+handle_cast({add, Stat}, Data) -> {noreply, add_stat(Stat, Data)};
+handle_cast(Request, Data) -> io:format("Unhandled cast: ~w~n", [Request]), {noreply, Data}.
 
-handle_info(timeout, {ForwardingInfo, Stats}) ->
-    case forward_data(add_basic(Stats), ForwardingInfo) of
-        ok -> {noreply, {ForwardingInfo, []}, ?FORWARD_DELAY};
+handle_info(forward, Data) ->
+    case forward_data(add_basic(get_stats(Data)), get_forwarding_info(Data)) of
+        ok -> {noreply, clear_stats(Data)};
 
         {error, {transient, Message}} ->
             io:format("Failed to forward data: ~s.~n", [Message]),
-            {noreply, {ForwardingInfo, Stats, ?FORWARD_DELAY}};
+            {noreply, Data};
         {error, {permanent, Message}} ->
             io:format("Failed to forward data: ~s.~n", [Message]),
             {stop, fatal_error}
     end;
-handle_info(_, Data) -> {noreply, Data}.
+handle_info(hi, Data) -> io:format("~w~n", [Data]);
+handle_info(Info, Data) -> io:format("Unhandled info: ~s.~n", [Info]), {noreply, Data}.
 
 code_change(_, Data, _) -> {ok, Data}.
 
 % ===== Private
+
+% Create initial data.
+create_data(ForwardingInfo) -> {ForwardingInfo, [], setup_timer()}.
+
+get_forwarding_info({ForwardingInfo, _, _}) -> ForwardingInfo.
+
+get_stats({_, Stats, _}) -> Stats.
+
+clear_stats({F, _, T}) -> {F, [], T}.
+
+setup_timer() ->
+    case timer:send_interval(?FORWARD_DELAY, forward) of
+        {ok, Ref} -> Ref;
+        {error, _} -> exit(timer_setup_failed)
+    end.
 
 get_forwarding_info() ->
     case application:get_env(statistics_forwarding) of
@@ -67,8 +83,13 @@ get_forwarding_info(influx, Options) ->
      dict:fetch(uri, Options),
      base64:encode_to_string(dict:fetch(username, Options) ++ ":" ++ dict:fetch(password, Options))}.
 
+% Create a new stat and record the time of this call as the generation time.
 new_stat(Name, Value) -> {Name, Value, erlang:system_time()}.
 
+% Add a new stat to be reported.
+add_stat(Stat, {F, S, T}) -> {F, [Stat|S], T}.
+
+% Forward stats to Influx for reporting.
 forward_data(Stats, {influx, Uri, Authorization}) ->
     case ecs_influx:write(Stats, Uri, Authorization) of
         ok -> ok;
