@@ -99,4 +99,6 @@ hostname_to_node(Name, Host) -> erlang:list_to_atom(Name ++ "@" ++ Host).
 % Generate a timeout in milliseconds depending on how large the cluster is to
 % help reduce reconnect operations from every node happening at the same time.
 generate_timeout() ->
-    rand:uniform((erlang:length(erlang:nodes(connected)) + 5) * 60 * 1000).
+    Wait = rand:uniform((erlang:length(erlang:nodes(connected)) + 5) * 60 * 1000),
+    ecs_statistics:record("reconnect_attempt_wait", Wait),
+    Wait.
