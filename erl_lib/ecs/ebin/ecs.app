@@ -6,6 +6,7 @@
              ecs_master,
              ecs_connectivity,
 			 ecs_influx,
-			 ecs_statistics]},
+			 ecs_statistics
+			 ecs_util]},
   {applications, [ssl]}
  ]}.
