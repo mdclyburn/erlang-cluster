@@ -13,11 +13,13 @@ init(_) ->
          intensity => 5,
          period => 60},
 
+       configured_roles(ecs_config:roles(erlang:list_to_atom(ecs_util:host())))
+       ++
        [
         #{id => statistics,
           start => {ecs_statistics, start_link, []},
           restart => permanent,
-          shutdown => 2000,
+          shutdown => 5000,
           type => worker,
           modules => [ecs_statistics]},
 
@@ -29,3 +31,21 @@ init(_) ->
           modules => [ecs_connectivity]}
        ]
      }}.
+
+configured_roles(Roles) -> configured_roles(Roles, []).
+configured_roles([], ChildSpecs) -> ChildSpecs;
+configured_roles([Role|Rest], ChildSpecs) ->
+    io:format("Configuring for ~w role.~n", [Role]),
+    case Role of
+        stat_forward ->
+            configured_roles(Rest,
+                             [#{id => stat_forwarder,
+                                start => {ecs_statforwarder, start_link, []},
+                                restart => permanent,
+                                shutdown => 5000,
+                                type => worker,
+                                modules => [ecs_statforwarder]} | ChildSpecs]);
+        UnknownRole ->
+            io:format("Unconfigurable role: ~w~n", UnknownRole),
+            configured_roles(Rest, ChildSpecs)
+    end.

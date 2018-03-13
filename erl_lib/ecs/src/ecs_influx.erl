@@ -23,7 +23,7 @@ write(Stats, Uri, Authorization) when is_list(Stats) ->
     end.
 
 % Convert generic statistics into Influx-compatible data.
-translate({Name, Value, Time}) -> tag(new_measurement(Name, Value, Time)).
+translate({Name, Value, Time, Origin}) -> tag(new_measurement(Name, Value, Time), Origin).
 
 % ===== Private
 
@@ -49,14 +49,14 @@ add_tag(Name, Value, {MeasurementName, MeasurementValue, Time, Tags}) when is_li
     {MeasurementName, MeasurementValue, Time, [{Name, Value}|Tags]}.
 
 % Add information to identify the node measurements are taken from.
-tag(Measurement) ->
-    tag(Measurement,
-                [{"node_name", ecs_util:name()},
-                 {"node_host", ecs_util:host()},
-                 {"node", erlang:atom_to_list(erlang:node())}]).
+tag(Measurement, Origin) when is_atom(Origin) ->
+    add_tags(Measurement,
+                [{"node_name", ecs_util:name(Origin)},
+                 {"node_host", ecs_util:host(Origin)},
+                 {"node", erlang:atom_to_list(Origin)}]).
 
-tag(Measurement, []) -> Measurement;
-tag(Measurement, [{N, V}|Rest]) -> tag(add_tag(N, V, Measurement), Rest).
+add_tags(Measurement, []) -> Measurement;
+add_tags(Measurement, [{N, V}|Rest]) -> add_tags(add_tag(N, V, Measurement), Rest).
 
 % Translates an HTTP response to an ok or error.
 map_response({{_, Code, _}, _, _}) ->

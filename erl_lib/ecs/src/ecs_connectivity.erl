@@ -26,7 +26,9 @@ reload_nodes() -> gen_server:cast(?MODULE, reload).
 
 init(_) ->
     io:format("Connectivity service started.~n"),
-    {ok, ecs_config:nodes(), generate_timeout()}.
+    Nodes = get_nodes(),
+    reconnect(Nodes),
+    {ok, Nodes, generate_timeout()}.
 
 terminate(Reason, _) ->
     io:format("Connectivity service stopping: ~w.~n", [Reason]).
@@ -45,12 +47,25 @@ code_change(_, Data, _) -> {ok, Data}.
 
 %% ===== Private
 
+get_nodes() ->
+    lists:map(fun (Host) -> erlang:list_to_atom(
+                              ecs_util:name()
+                              ++ "@"
+                              ++ erlang:atom_to_list(Host)) end,
+                            ecs_config:nodes()).
+
 % Attempt to connect to nodes that are listed in the nodes file but are not
 % currently connected. This function recognizes that multiple nodes may be
 % connected to with a single net_kernel:connect.
-reconnect(Known) -> reconnect(lists:subtract(Known, nodes(connected)), 0).
+reconnect(Known) -> reconnect(
+                      lists:subtract(
+                        lists:filter(fun (N) -> N /= erlang:node() end,
+                                     Known),
+                        nodes(connected)),
+                      0).
 reconnect([], ConnectionsMade) -> ecs_statistics:record("connects_per_reconnect", ConnectionsMade), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
+    io:format("attempting to connect to ~w...~n", [UnconnectedNode]),
     case net_kernel:connect(UnconnectedNode) of
         true ->
             timer:sleep(1000),

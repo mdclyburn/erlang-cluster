@@ -2,7 +2,8 @@
 -behavior(gen_server).
 
 -export([start_link/0,
-         record/2]).
+         record/2,
+         queued/0]).
 -export([init/1,
          terminate/2,
          handle_call/3,
@@ -10,95 +11,77 @@
          handle_info/2,
          code_change/3]).
 
--define(FORWARD_DELAY, 10000).
-
-% ===== Public
+-define(FORWARD_DELAY, 3000).
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-% Report a statistic.
-record(Name, Value) when is_list(Name) -> gen_server:cast(?MODULE, {add, new_stat(Name, Value)}).
+record(Name, Value) -> gen_server:cast(?MODULE, {record, new_stat(Name, Value)}).
+
+queued() -> gen_server:call(?MODULE, get).
 
 % ===== gen_server
 
 init(_) ->
     io:format("Statistics service started.~n"),
-    inets:start(),
-    case get_forwarding_info() of
-        ForwardingInfo = {influx, Uri, _} ->
-            io:format("Data will be forwarded to Influx (~s).~n", [Uri]),
-            {ok, create_data(ForwardingInfo)};
-        none ->
-            io:format("No data will be forwarded.~n"),
-            {ok, nil}
-    end.
+    {ok, create_data()}.
 
-terminate(Reason, _) -> io:format("Statistics forwarder stopping: ~w.~n", [Reason]).
+terminate(Reason, Data) ->
+    io:format("Statistics service flushing statistics and exiting: ~w.~n", [Reason]),
+    flush(Data).
 
-handle_call(Request, _, Data) -> io:format("Unhandled call: ~s.~n", [Request]), {reply, unknown, Data}.
+handle_call(get, _, Data) -> {reply, get_stats(Data), Data};
+handle_call(_, _, Data) -> {reply, unknown, Data}.
 
-handle_cast({add, Stat}, Data) -> {noreply, add_stat(Stat, Data)};
-handle_cast(Request, Data) -> io:format("Unhandled cast: ~w~n", [Request]), {noreply, Data}.
+handle_cast({record, Stat}, Data) -> {noreply, add_stat(Stat, Data)};
+handle_cast(_, Data) -> {noreply, Data}.
 
-handle_info(forward, Data) ->
-    case forward_data(add_basic(get_stats(Data)), get_forwarding_info(Data)) of
-        ok -> {noreply, clear_stats(Data)};
-
-        {error, {transient, Message}} ->
-            io:format("Failed to forward data: ~s.~n", [Message]),
-            {noreply, Data};
-        {error, {permanent, Message}} ->
-            io:format("Failed to forward data: ~s.~n", [Message]),
-            {stop, fatal_error}
-    end;
-handle_info(hi, Data) -> io:format("~w~n", [Data]);
-handle_info(Info, Data) -> io:format("Unhandled info: ~s.~n", [Info]), {noreply, Data}.
+handle_info(submit, Data) -> {noreply, flush(Data)};
+handle_info(_, Data) -> {noreply, Data}.
 
 code_change(_, Data, _) -> {ok, Data}.
 
 % ===== Private
 
-% Create initial data.
-create_data(ForwardingInfo) -> {ForwardingInfo, [], setup_timer()}.
-
-get_forwarding_info({ForwardingInfo, _, _}) -> ForwardingInfo.
-
-get_stats({_, Stats, _}) -> Stats.
-
-clear_stats({F, _, T}) -> {F, [], T}.
-
-setup_timer() ->
-    case timer:send_interval(?FORWARD_DELAY, forward) of
-        {ok, Ref} -> Ref;
-        {error, _} -> exit(timer_setup_failed)
+% Initialize internal data.
+create_data() -> create_data(
+                   lists:map(fun (Host) ->
+                                     erlang:list_to_atom(ecs_util:name() ++ "@" ++ erlang:atom_to_list(Host)) end,
+                             ecs_config:nodes_of_role(stat_forward))).
+create_data(Forwarders) ->
+    case lists:member(stat_forward, ecs_config:roles(ecs_util:host_a())) of
+        true -> {[], [erlang:node()], setup_timer()};
+        false -> {[], Forwarders, setup_timer()}
     end.
 
-get_forwarding_info() ->
-    case application:get_env(statistics_forwarding) of
-        {ok, {Method, Options}} -> get_forwarding_info(Method, dict:from_list(Options));
-        {error, _} -> throw(bad_statf_config);
-        _ -> none
-    end.
-get_forwarding_info(influx, Options) ->
-    {influx,
-     dict:fetch(uri, Options),
-     base64:encode_to_string(dict:fetch(username, Options) ++ ":" ++ dict:fetch(password, Options))}.
+get_stats({S, _, _}) -> S.
+get_forwarders({_, F, _}) -> F.
+
+add_stat(Stat, {S, F, T}) -> {[Stat|S], F, T}.
+clear_stats({_, F, T}) -> {[], F, T}.
 
 % Create a new stat and record the time of this call as the generation time.
-new_stat(Name, Value) -> {Name, Value, erlang:system_time()}.
+new_stat(Name, Value) -> {Name, Value, erlang:system_time(), erlang:node()}.
 
-% Add a new stat to be reported.
-add_stat(Stat, {F, S, T}) -> {F, [Stat|S], T}.
-
-% Forward stats to Influx for reporting.
-forward_data(Stats, {influx, Uri, Authorization}) ->
-    case ecs_influx:write(Stats, Uri, Authorization) of
-        ok -> ok;
-        {error, 401} -> {error, {permanent, "bad authentication credentials"}};
-        {error, Code} -> {error, {transient, io_lib:format("HTTP ~b", [Code])}}
+setup_timer() ->
+    case timer:send_interval(?FORWARD_DELAY, submit) of
+        {ok, Ref} -> Ref;
+        {error, _} -> exit(timer_setup_failed)
     end.
 
 % Add common data measurements.
 add_basic(Stats) ->
     Stats ++
         [new_stat("process_count", erlang:length(erlang:processes()))].
+
+flush(Data) ->
+    case ecs_statforwarder:submit(add_basic(get_stats(Data)), randomize(get_forwarders(Data))) of
+        ok -> clear_stats(Data);
+        {error, no_forwarder} -> io:format("No forwarder available; retaining data.~n"), Data % this will grow without bound...
+    end.
+
+% Randomize a list.
+randomize([]) -> [];
+randomize(L) when is_list(L) ->
+    lists:map(fun ({_, E}) -> E end,
+              lists:sort(
+                lists:map(fun (E) -> {rand:uniform(25 * erlang:length(L)), E} end, L))).
