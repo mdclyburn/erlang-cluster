@@ -26,14 +26,14 @@ reload_nodes() -> gen_server:cast(?MODULE, reload).
 
 init(_) ->
     io:format("Connectivity service started.~n"),
-    {ok, ecs_config:cluster_nodes(), generate_timeout()}.
+    {ok, ecs_config:nodes(), generate_timeout()}.
 
 terminate(Reason, _) ->
     io:format("Connectivity service stopping: ~w.~n", [Reason]).
 
 handle_call(_, _, Data) -> {reply, unknown, Data}.
 
-handle_cast(reload, _) -> {noreply, ecs_config:cluster_nodes()};
+handle_cast(reload, _) -> {noreply, ecs_config:nodes()};
 handle_cast(_, Data) -> {noreply, Data}.
 
 handle_info(timeout, Nodes) ->
