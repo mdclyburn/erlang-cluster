@@ -53,13 +53,11 @@ create_data(Forwarders) ->
         false -> {[], Forwarders, setup_timer()}
     end.
 
-get_stats({S, _, _}) -> S.
 get_forwarders({_, F, _}) -> F.
 
 add_stat(Stat, {S, F, T}) -> {[Stat|S], F, T}.
+get_stats({S, _, _}) -> S.
 clear_stats({_, F, T}) -> {[], F, T}.
-
-% Create a new stat and record the time of this call as the generation time.
 new_stat(Name, Value) -> {Name, Value, erlang:system_time(), erlang:node()}.
 
 setup_timer() ->
