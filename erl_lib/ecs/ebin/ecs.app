@@ -4,6 +4,7 @@
   {mod, {ecs, []}},
   {modules, [ecs,
              ecs_master,
+             ecs_config,
              ecs_connectivity,
 			 ecs_influx,
 			 ecs_statistics,
