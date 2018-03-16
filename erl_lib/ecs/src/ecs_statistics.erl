@@ -69,7 +69,9 @@ setup_timer() ->
 % Add common data measurements.
 add_basic(Stats) ->
     Stats ++
-        [new_stat("process_count", erlang:length(erlang:processes()))].
+        [new_stat("process_count", erlang:length(erlang:processes())),
+         new_stat("memory_atom", erlang:memory(atom)),
+         new_stat("memory_atom_used", erlang:memory(atom_used))].
 
 flush(Data) ->
     case ecs_statforwarder:submit(add_basic(get_stats(Data)), randomize(get_forwarders(Data))) of
