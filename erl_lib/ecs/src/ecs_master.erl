@@ -45,6 +45,14 @@ configured_roles([Role|Rest], ChildSpecs) ->
                                 shutdown => 5000,
                                 type => worker,
                                 modules => [ecs_statforwarder]} | ChildSpecs]);
+        appm ->
+            configured_roles(Rest,
+                             [#{id => app_manager,
+                                start => {ecs_app, start_link, []},
+                                restart => permanent,
+                                shutdown => 5000,
+                                type => worker,
+                                modules => [ecs_app]} | ChildSpecs]);
         UnknownRole ->
             io:format("Unconfigurable role: ~w~n", UnknownRole),
             configured_roles(Rest, ChildSpecs)

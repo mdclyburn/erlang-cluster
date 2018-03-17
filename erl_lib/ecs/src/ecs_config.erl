@@ -2,6 +2,7 @@
 -export([cluster/0,
          nodes/0,
          roles/1,
+         applications/1,
          nodes_of_role/1]).
 
 cluster() ->
@@ -9,10 +10,10 @@ cluster() ->
         {ok, [Nodes]} -> Nodes
     end.
 
-nodes() -> lists:map(fun ({Name, _}) -> Name end, cluster()).
+nodes() -> lists:map(fun ({Name, _, _}) -> Name end, cluster()).
 
 roles(Name) ->
-    case lists:filtermap(fun ({N, R}) ->
+    case lists:filtermap(fun ({N, R, _}) ->
                                  case N == Name of
                                      true -> {true, R};
                                      false -> false
@@ -24,8 +25,21 @@ roles(Name) ->
         Result -> lists:nth(1, Result)
     end.
 
+applications(Name) ->
+    case lists:filtermap(fun ({N, _, A}) ->
+                                 case N == Name of
+                                     true -> {true, A};
+                                     false -> false
+                                 end
+                         end,
+                         cluster())
+    of
+        [] -> [];
+        Result -> lists:nth(1, Result)
+    end.
+
 nodes_of_role(Role) -> lists:filtermap(
-                         fun ({Name, Roles}) ->
+                         fun ({Name, Roles, _}) ->
                                  case lists:member(Role, Roles) of
                                      true -> {true, Name};
                                      false -> false
