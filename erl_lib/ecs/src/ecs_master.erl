@@ -13,9 +13,14 @@ init(_) ->
          intensity => 5,
          period => 60},
 
-       configured_roles(ecs_config:roles(erlang:list_to_atom(ecs_util:host())))
-       ++
        [
+        #{id => config_manager,
+          start => {ecs_config_manager, start_link, []},
+          restart => permanent,
+          shutdown => 1000,
+          type => worker,
+          modules => [ecs_config_manager]},
+
         #{id => statistics,
           start => {ecs_statistics, start_link, []},
           restart => permanent,
@@ -30,6 +35,7 @@ init(_) ->
           type => worker,
           modules => [ecs_connectivity]}
        ]
+       ++ configured_roles(ecs_config:roles(erlang:list_to_atom(ecs_util:host())))
      }}.
 
 configured_roles(Roles) -> configured_roles(Roles, []).

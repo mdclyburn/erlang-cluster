@@ -6,6 +6,7 @@
              ecs_master,
              ecs_app,
              ecs_config,
+             ecs_config_manager,
              ecs_connectivity,
 			 ecs_influx,
              ecs_stat,

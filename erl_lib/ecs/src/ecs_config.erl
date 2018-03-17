@@ -4,7 +4,8 @@
          roles/1,
          applications/1,
          nodes_of_role/1,
-         nodes_of_application/1]).
+         nodes_of_application/1,
+         nodes_of_application_r/1]).
 
 cluster() ->
     case file:consult(config_directory() ++ "/nodes") of
@@ -56,6 +57,9 @@ nodes_of_application(Application) -> lists:filtermap(
                                  end
                          end,
                          cluster()).
+
+nodes_of_application_r(Application) ->
+    ecs_util:randomize(nodes_of_application(Application)).
 
 % ===== Private
 
