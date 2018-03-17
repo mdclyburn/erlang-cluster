@@ -16,7 +16,6 @@
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-% Send statistics to a forwarder.
 submit([], _) -> ok;
 submit(_, []) -> {error, no_forwarder};
 submit(Stats, [Forwarder|Rest]) when is_list(Stats) ->
@@ -72,8 +71,11 @@ create_data(ForwardingInfo) -> {ForwardingInfo, [], setup_timer()}.
 
 get_forwarding_info({ForwardingInfo, _, _}) -> ForwardingInfo.
 
+% Add a new stat to be reported.
 add_stats(Stats, {F, S, T}) -> {F, Stats ++ S, T}.
+
 get_stats({_, Stats, _}) -> Stats.
+
 clear_stats({F, _, T}) -> {F, [], T}.
 
 setup_timer() ->

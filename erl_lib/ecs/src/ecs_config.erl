@@ -3,7 +3,8 @@
          nodes/0,
          roles/1,
          applications/1,
-         nodes_of_role/1]).
+         nodes_of_role/1,
+         nodes_of_application/1]).
 
 cluster() ->
     case file:consult(config_directory() ++ "/nodes") of
@@ -41,6 +42,15 @@ applications(Name) ->
 nodes_of_role(Role) -> lists:filtermap(
                          fun ({Name, Roles, _}) ->
                                  case lists:member(Role, Roles) of
+                                     true -> {true, Name};
+                                     false -> false
+                                 end
+                         end,
+                         cluster()).
+
+nodes_of_application(Application) -> lists:filtermap(
+                         fun ({Name, _, Applications}) ->
+                                 case lists:member(Application, Applications) of
                                      true -> {true, Name};
                                      false -> false
                                  end

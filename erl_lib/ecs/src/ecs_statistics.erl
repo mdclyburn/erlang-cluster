@@ -2,7 +2,7 @@
 -behavior(gen_server).
 
 -export([start_link/0,
-         record/2,
+         record/3,
          queued/0]).
 -export([init/1,
          terminate/2,
@@ -15,7 +15,8 @@
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-record(Name, Value) -> gen_server:cast(?MODULE, {record, new_stat(Name, Value)}).
+record(update, Name, Value) -> gen_server:cast(?MODULE, {update, Name, Value});
+record(overwrite, Name, Value) -> gen_server:cast(?MODULE, {overwrite, Name, Value}).
 
 queued() -> gen_server:call(?MODULE, get).
 
@@ -32,7 +33,8 @@ terminate(Reason, Data) ->
 handle_call(get, _, Data) -> {reply, get_stats(Data), Data};
 handle_call(_, _, Data) -> {reply, unknown, Data}.
 
-handle_cast({record, Stat}, Data) -> {noreply, add_stat(Stat, Data)};
+handle_cast({update, Name, Value}, Data) -> {noreply, update_stat(Name, Value, Data)};
+handle_cast({overwrite, Name, Value}, Data) -> {noreply, overwrite_stat(Name, Value, Data)};
 handle_cast(_, Data) -> {noreply, Data}.
 
 handle_info(submit, Data) -> {noreply, flush(Data)};
@@ -49,16 +51,30 @@ create_data() -> create_data(
                              ecs_config:nodes_of_role(stat_forward))).
 create_data(Forwarders) ->
     case lists:member(stat_forward, ecs_config:roles(ecs_util:host_a())) of
-        true -> {[], [erlang:node()], setup_timer()};
-        false -> {[], Forwarders, setup_timer()}
+        true -> {dict:new(), [erlang:node()], setup_timer()};
+        false -> {dict:new(), Forwarders, setup_timer()}
     end.
 
 get_forwarders({_, F, _}) -> F.
 
-add_stat(Stat, {S, F, T}) -> {[Stat|S], F, T}.
+update_stat(Name, Value, {Stats, F, T}) ->
+    {dict:update(Name,
+                 fun (Stat) -> ecs_stat:modify(Stat, Value) end,
+                 ecs_stat:new(Value),
+                 Stats),
+     F,
+     T}.
+
+overwrite_stat(Name, Value, {Stats, F, T}) ->
+    {dict:update(Name,
+                 fun (Stat) -> ecs_stat:overwrite(Stat, Value) end,
+                 ecs_stat:new(Value),
+                 Stats),
+     F,
+     T}.
+
 get_stats({S, _, _}) -> S.
-clear_stats({_, F, T}) -> {[], F, T}.
-new_stat(Name, Value) -> {Name, Value, erlang:system_time(), erlang:node()}.
+clear_stats({_, F, T}) -> {dict:new(), F, T}.
 
 setup_timer() ->
     case timer:send_interval(?FORWARD_DELAY, submit) of
@@ -68,20 +84,21 @@ setup_timer() ->
 
 % Add common data measurements.
 add_basic(Stats) ->
-    Stats ++
-        [new_stat("process_count", erlang:length(erlang:processes())),
-         new_stat("memory_atom", erlang:memory(atom)),
-         new_stat("memory_atom_used", erlang:memory(atom_used))].
+    add_basic(Stats,
+              [{"process_count", erlang:length(erlang:processes())},
+               {"memory_atom", erlang:memory(atom)},
+               {"memory_atom_used", erlang:memory(atom_used)}]).
+add_basic(Stats, []) -> Stats;
+add_basic(Stats, [{Name, Value}|Rest]) ->
+    record(overwrite, Name, Value),
+    add_basic(Stats, Rest).
 
 flush(Data) ->
-    case ecs_statforwarder:submit(add_basic(get_stats(Data)), randomize(get_forwarders(Data))) of
+    case ecs_statforwarder:submit(
+           lists:map(
+             fun ({Name, Stat}) -> ecs_stat:to_tuple(Name, Stat) end,
+             dict:to_list(add_basic(get_stats(Data)))),
+           ecs_util:randomize(get_forwarders(Data))) of
         ok -> clear_stats(Data);
         {error, no_forwarder} -> io:format("No forwarder available; retaining data.~n"), Data % this will grow without bound...
     end.
-
-% Randomize a list.
-randomize([]) -> [];
-randomize(L) when is_list(L) ->
-    lists:map(fun ({_, E}) -> E end,
-              lists:sort(
-                lists:map(fun (E) -> {rand:uniform(25 * erlang:length(L)), E} end, L))).

@@ -8,7 +8,9 @@
              ecs_config,
              ecs_connectivity,
 			 ecs_influx,
+             ecs_stat,
 			 ecs_statistics,
+             ecs_statforwarder,
 			 ecs_util]},
   {applications, [ssl]}
  ]}.

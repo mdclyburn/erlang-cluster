@@ -63,7 +63,7 @@ reconnect(Known) -> reconnect(
                                      Known),
                         nodes(connected)),
                       0).
-reconnect([], ConnectionsMade) -> ecs_statistics:record("connects_per_reconnect", ConnectionsMade), ok;
+reconnect([], ConnectionsMade) -> ecs_statistics:record(overwrite, "connects_per_reconnect", ConnectionsMade), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
     io:format("attempting to connect to ~w...~n", [UnconnectedNode]),
     case net_kernel:connect(UnconnectedNode) of
@@ -79,5 +79,5 @@ reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
 % help reduce reconnect operations from every node happening at the same time.
 generate_timeout() ->
     Wait = rand:uniform((erlang:length(erlang:nodes(connected)) + 5) * 60 * 1000),
-    ecs_statistics:record("reconnect_attempt_wait", Wait),
+    ecs_statistics:record(overwrite, "reconnect_attempt_wait", Wait),
     Wait.
