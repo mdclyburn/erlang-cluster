@@ -101,6 +101,9 @@ overwrite_stat(Id, Value, {Stats, F, T}) ->
 get_stats({S, _, _}) -> S.
 
 clear_stats({S, F, T}) ->
+    {dict:filter(fun (_, Stat) -> ecs_stat:continuous(Stat) == true end, S), F, T}.
+
+reset_stats({S, F, T}) ->
     {dict:map(fun (_, Stat) -> ecs_stat:overwrite(0, Stat) end, S), F, T}.
 
 setup_timer() ->
@@ -117,7 +120,7 @@ add_basic(Stats) ->
 
 add_basic(Stats, []) -> Stats;
 add_basic(Stats, [Id|Rest]) ->
-    add_basic(dict:store(Id, ecs_stat:new(Id), Stats), Rest).
+    add_basic(dict:store(Id, ecs_stat:new(Id, 0, [], true), Stats), Rest).
 
 % Update common data measurements.
 update_basic(Stats) ->
@@ -136,6 +139,6 @@ flush(Data) ->
              dict:to_list(update_basic(get_stats(Data)))),
            ecs_util:randomize(get_forwarders(Data)))
     of
-        ok -> clear_stats(Data);
+        ok -> reset_stats(clear_stats(Data));
         {error, no_forwarder} -> io:format("No forwarder available; retaining data.~n"), Data % this will grow without bound...
     end.

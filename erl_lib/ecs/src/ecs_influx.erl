@@ -23,7 +23,7 @@ write(Stats, Uri, Authorization) when is_list(Stats) ->
     end.
 
 % Convert generic statistics into Influx-compatible data.
-translate({Name, Value, Time, Origin, Tags}) ->
+translate({Name, Value, Time, Origin, Tags, _}) ->
     add_tags(new_measurement(Name, Value, Time), Tags ++ get_basic_tags(Origin)).
 
 % ===== Private
