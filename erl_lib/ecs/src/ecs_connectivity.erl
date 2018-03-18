@@ -26,6 +26,7 @@ reload_nodes() -> gen_server:cast(?MODULE, reload).
 
 init(_) ->
     io:format("Connectivity service started.~n"),
+    add_statistics(),
     Nodes = get_nodes(),
     reconnect(Nodes),
     {ok, Nodes, generate_timeout()}.
@@ -63,7 +64,7 @@ reconnect(Known) -> reconnect(
                                      Known),
                         nodes(connected)),
                       0).
-reconnect([], ConnectionsMade) -> ecs_statistics:record(overwrite, "connects_per_reconnect", ConnectionsMade), ok;
+reconnect([], ConnectionsMade) -> ecs_statistics:overwrite("connects_per_reconnect", ConnectionsMade), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
     io:format("attempting to connect to ~w...~n", [UnconnectedNode]),
     case net_kernel:connect(UnconnectedNode) of
@@ -79,5 +80,13 @@ reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
 % help reduce reconnect operations from every node happening at the same time.
 generate_timeout() ->
     Wait = rand:uniform((erlang:length(erlang:nodes(connected)) + 5) * 60 * 1000),
-    ecs_statistics:record(overwrite, "reconnect_attempt_wait", Wait),
+    ecs_statistics:overwrite("reconnect_attempt_wait", Wait),
     Wait.
+
+add_statistics() ->
+    add_statistics(["reconnect_attempt_wait", "connects_per_reconnect"]).
+
+add_statistics([]) -> ok;
+add_statistics([Id|Rest]) ->
+    ecs_statistics:add(Id, ecs_stat:new(Id)),
+    add_statistics(Rest).

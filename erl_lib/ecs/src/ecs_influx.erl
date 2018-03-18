@@ -23,7 +23,8 @@ write(Stats, Uri, Authorization) when is_list(Stats) ->
     end.
 
 % Convert generic statistics into Influx-compatible data.
-translate({Name, Value, Time, Origin}) -> tag(new_measurement(Name, Value, Time), Origin).
+translate({Name, Value, Time, Origin, Tags}) ->
+    add_tags(new_measurement(Name, Value, Time), Tags ++ get_basic_tags(Origin)).
 
 % ===== Private
 
@@ -45,15 +46,15 @@ measurement_to_string({Name, Value, Time, Tags}) ->
         ++ " " ++ erlang:integer_to_list(Time).
 
 % Add a tag to a measurement.
-add_tag(Name, Value, {MeasurementName, MeasurementValue, Time, Tags}) when is_list(Name), is_list(Value) ->
+add_tag(Name, Value, {MeasurementName, MeasurementValue, Time, Tags})
+  when is_list(Name), is_list(Value) ->
     {MeasurementName, MeasurementValue, Time, [{Name, Value}|Tags]}.
 
 % Add information to identify the node measurements are taken from.
-tag(Measurement, Origin) when is_atom(Origin) ->
-    add_tags(Measurement,
-                [{"node_name", ecs_util:name(Origin)},
-                 {"node_host", ecs_util:host(Origin)},
-                 {"node", erlang:atom_to_list(Origin)}]).
+get_basic_tags(Origin) when is_atom(Origin) ->
+    [{"node_name", ecs_util:name(Origin)},
+     {"node_host", ecs_util:host(Origin)},
+     {"node", erlang:atom_to_list(Origin)}].
 
 add_tags(Measurement, []) -> Measurement;
 add_tags(Measurement, [{N, V}|Rest]) -> add_tags(add_tag(N, V, Measurement), Rest).
