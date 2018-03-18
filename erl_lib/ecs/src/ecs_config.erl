@@ -52,7 +52,10 @@ nodes_of_role(Role) -> lists:filtermap(
 nodes_of_application(Application) -> lists:filtermap(
                          fun ({Name, _, Applications}) ->
                                  case lists:member(Application, Applications) of
-                                     true -> {true, Name};
+                                     true -> {true, erlang:list_to_atom(
+                                                     ecs_util:name()
+                                                      ++ "@"
+                                                      ++ erlang:atom_to_list(Name))};
                                      false -> false
                                  end
                          end,

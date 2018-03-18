@@ -1,7 +1,8 @@
 -module(ecs_config_manager).
 -behavior(gen_server).
 
--export([start_link/0]).
+-export([start_link/0,
+         get_application_nodes/1]).
 -export([init/1,
          terminate/2,
          handle_call/3,
@@ -10,6 +11,9 @@
          code_change/3]).
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+get_application_nodes(Application) ->
+    gen_server:call(?MODULE, {get, Application}).
 
 init(_) -> {ok, nil}.
 
