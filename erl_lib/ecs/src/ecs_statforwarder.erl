@@ -100,5 +100,5 @@ forward_data(Stats, {influx, Uri, Authorization}) ->
     case ecs_influx:write(Stats, Uri, Authorization) of
         ok -> ok;
         {error, 401} -> {error, {permanent, "bad authentication credentials"}};
-        {error, Code} -> {error, {transient, io_lib:format("HTTP ~b", [Code])}}
+        {error, Info} -> {error, {transient, io_lib:format("~w", [Info])}}
     end.
