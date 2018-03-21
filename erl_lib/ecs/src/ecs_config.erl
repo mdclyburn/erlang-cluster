@@ -2,6 +2,7 @@
 -export([cluster/0,
          nodes/0,
          roles/1,
+         applications/0,
          applications/1,
          nodes_of_role/1,
          nodes_of_application/1,
@@ -26,6 +27,8 @@ roles(Name) ->
         [] -> [];
         Result -> lists:nth(1, Result)
     end.
+
+applications() -> applications(ecs_util:host_a()).
 
 applications(Name) ->
     case lists:filtermap(fun ({N, _, A}) ->
