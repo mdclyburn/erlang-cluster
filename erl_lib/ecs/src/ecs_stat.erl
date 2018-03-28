@@ -1,9 +1,13 @@
 -module(ecs_stat).
 -include("ecs_stat.hrl").
 
--export([new/4,
+-export([new/1,
+         new/2,
+         new/3,
+         new/4,
          set_opts/2,
          update/2,
+         reset/1,
          continuous/1]).
 
 % Create a new Stat record.
