@@ -9,9 +9,14 @@
 % Create a new Stat record.
 % Opts is a list of key-value pairs of options.
 % Available options:
-%   {continuous, true|false} - whether the measurement is a continuous one
-%   {aggregation, fn/2} - function used to aggregate values where the first
+%   {continuous, true|false}
+%     whether the measurement is a continuous one
+%   {aggregation, fn/2}
+%     function used to aggregate values where the first
 %     parameter is the new value and the second parameter is the old value
+%   {reset, fn/1}
+%     function used to reset the value of the statistic where the parameter
+%     is the current value
 new(Name, Value, Tags, Opts) ->
     #stat{
        name = Name,
@@ -33,5 +38,13 @@ apply(Value, Stat) ->
       value = (maps:get(aggregation,
                         Stat#stat.options,
                         fun (New, _) -> New end))(Value, Stat#stat.value)}.
+
+% Apply the reset function to the stored value of a stat. If the stat does not
+% have a reset function, then the value is set to zero.
+reset(Stat) ->
+    Stat#stat{
+      value = (maps:get(reset,
+                        Stat#stat.options,
+                        fun(_) -> 0 end))(Stat#stat.value)}.
 
 continuous(Stat) -> maps:get(continuous, Stat#stat.options, true).
