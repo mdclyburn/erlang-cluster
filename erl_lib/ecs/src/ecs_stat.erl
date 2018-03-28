@@ -42,6 +42,7 @@ set_opts(Stat, [{Option, Value}|Rest]) ->
 % function supplied, the value is simply overwritten.
 update(Value, Stat) ->
     Stat#stat{
+      time = erlang:system_time(),
       value = (maps:get(aggregation,
                         Stat#stat.options,
                         fun (New, _) -> New end))(Value, Stat#stat.value)}.
@@ -50,6 +51,7 @@ update(Value, Stat) ->
 % have a reset function, then the value is set to zero.
 reset(Stat) ->
     Stat#stat{
+      time = erlang:system_time(),
       value = (maps:get(reset,
                         Stat#stat.options,
                         fun(_) -> 0 end))(Stat#stat.value)}.
