@@ -4,7 +4,6 @@
 -export([start_link/0,
          add/2,
          update/2,
-         overwrite/2,
          queued/0]).
 -export([init/1,
          terminate/2,
@@ -19,7 +18,6 @@ start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 add(Id, Stat) -> gen_server:cast(?MODULE, {add, Id, Stat}).
 update(Id, Value) -> gen_server:cast(?MODULE, {update, Id, Value}).
-overwrite(Id, Value) -> gen_server:cast(?MODULE, {overwrite, Id, Value}).
 
 queued() -> gen_server:call(?MODULE, get).
 
@@ -38,7 +36,6 @@ handle_call(_, _, Data) -> {reply, unknown, Data}.
 
 handle_cast({add, Id, Stat}, Data) -> {noreply, add_stat(Id, Stat, Data)};
 handle_cast({update, Id, Value}, Data) -> {noreply, update_stat(Id, Value, Data)};
-handle_cast({overwrite, Id, Value}, Data) -> {noreply, overwrite_stat(Id, Value, Data)};
 handle_cast(_, Data) -> {noreply, Data}.
 
 handle_info(submit, Data) -> {noreply, flush(Data)};
@@ -76,20 +73,7 @@ update_stat(Id, Value, {Stats, F, T}) ->
     case dict:is_key(Id, Stats) of
         true ->
             {dict:update(Id,
-                         fun (Stat) -> ecs_stat:modify(Value, Stat) end,
-                         Stats),
-             F,
-             T};
-        false ->
-            io:format("Stat ~w does not exist; cannot update.~n", [Id]),
-            {Stats, F, T}
-    end.
-
-overwrite_stat(Id, Value, {Stats, F, T}) ->
-    case dict:is_key(Id, Stats) of
-        true ->
-            {dict:update(Id,
-                         fun (Stat) -> ecs_stat:overwrite(Value, Stat) end,
+                         fun (Stat) -> ecs_stat:update(Value, Stat) end,
                          Stats),
              F,
              T};
@@ -104,7 +88,7 @@ clear_stats({S, F, T}) ->
     {dict:filter(fun (_, Stat) -> ecs_stat:continuous(Stat) == true end, S), F, T}.
 
 reset_stats({S, F, T}) ->
-    {dict:map(fun (_, Stat) -> ecs_stat:overwrite(0, Stat) end, S), F, T}.
+    {dict:map(fun (_, Stat) -> ecs_stat:reset(Stat) end, S), F, T}.
 
 setup_timer() ->
     case timer:send_interval(?FORWARD_DELAY, submit) of
@@ -120,7 +104,7 @@ add_basic(Stats) ->
 
 add_basic(Stats, []) -> Stats;
 add_basic(Stats, [Id|Rest]) ->
-    add_basic(dict:store(Id, ecs_stat:new(Id, 0, [], true), Stats), Rest).
+    add_basic(dict:store(Id, ecs_stat:new(Id), Stats), Rest).
 
 % Update common data measurements.
 update_basic(Stats) ->
@@ -130,14 +114,13 @@ update_basic(Stats) ->
                {"memory_atom_used", erlang:memory(atom_used)}]).
 update_basic(Stats, []) -> Stats;
 update_basic(Stats, [{Id, Value}|Rest]) ->
-    update_basic(dict:update(Id, fun (Stat) -> ecs_stat:overwrite(Value, Stat) end, Stats), Rest).
+    update_basic(dict:update(Id, fun (Stat) -> ecs_stat:update(Value, Stat) end, Stats), Rest).
 
 flush(Data) ->
-    case ecs_statforwarder:submit(
-           lists:map(
-             fun ({_, Stat}) -> ecs_stat:to_tuple(Stat) end,
-             dict:to_list(update_basic(get_stats(Data)))),
-           ecs_util:randomize(get_forwarders(Data)))
+    case
+        ecs_statforwarder:submit(
+          lists:map(fun ({_, V}) -> V end, dict:to_list(update_basic(get_stats(Data)))),
+          ecs_util:randomize(get_forwarders(Data)))
     of
         ok -> reset_stats(clear_stats(Data));
         {error, no_forwarder} -> io:format("No forwarder available; retaining data.~n"), Data % this will grow without bound...

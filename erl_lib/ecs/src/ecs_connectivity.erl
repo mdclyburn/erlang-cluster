@@ -68,7 +68,7 @@ reconnect([], ConnectionsMade) -> ecs_statistics:add(
                                     ecs_stat:new("connects_per_reconnect",
                                                  ConnectionsMade,
                                                  [],
-                                                 false)), ok;
+                                                 [{continuous, false}])), ok;
 reconnect([UnconnectedNode|Rest], ConnectionsMade) ->
     io:format("attempting to connect to ~w...~n", [UnconnectedNode]),
     case net_kernel:connect(UnconnectedNode) of
@@ -88,5 +88,5 @@ generate_timeout() ->
       ecs_stat:new("reconnect_attempt_wait",
                    Wait,
                    [],
-                   false)),
+                   [{continuous, false}])),
     Wait.

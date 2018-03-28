@@ -1,4 +1,5 @@
 -module(ecs_influx).
+-include("ecs_stat.hrl").
 
 -export([write/3]).
 
@@ -23,8 +24,10 @@ write(Stats, Uri, Authorization) when is_list(Stats) ->
     end.
 
 % Convert generic statistics into Influx-compatible data.
-translate({Name, Value, Time, Origin, Tags, _}) ->
-    add_tags(new_measurement(Name, Value, Time), Tags ++ get_basic_tags(Origin)).
+translate(Stat) ->
+    add_tags(
+      new_measurement(Stat#stat.name, Stat#stat.value, Stat#stat.time),
+      Stat#stat.tags ++ get_basic_tags(Stat#stat.origin)).
 
 % ===== Private
 
