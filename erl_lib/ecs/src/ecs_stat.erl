@@ -3,7 +3,7 @@
 
 -export([new/4,
          set_opts/2,
-         apply/2,
+         update/2,
          continuous/1]).
 
 % Create a new Stat record.
@@ -36,7 +36,7 @@ set_opts(Stat, [{Option, Value}|Rest]) ->
 
 % Modify the stored value of a stat. If the stat does not have an aggregation
 % function supplied, the value is simply overwritten.
-apply(Value, Stat) ->
+update(Value, Stat) ->
     Stat#stat{
       value = (maps:get(aggregation,
                         Stat#stat.options,
