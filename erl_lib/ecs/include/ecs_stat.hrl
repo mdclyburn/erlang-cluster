@@ -1,0 +1,1 @@
+-record(stat, {name, value, tags, time, origin, options}).
