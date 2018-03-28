@@ -17,6 +17,9 @@
 %   {reset, fn/1}
 %     function used to reset the value of the statistic where the parameter
 %     is the current value
+new(Name) -> new(Name, 0).
+new(Name, Value) -> new(Name, Value, []).
+new(Name, Value, Tags) -> new(Name, Value, Tags, []).
 new(Name, Value, Tags, Opts) ->
     #stat{
        name = Name,
