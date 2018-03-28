@@ -119,7 +119,7 @@ update_basic(Stats, [{Id, Value}|Rest]) ->
 flush(Data) ->
     case
         ecs_statforwarder:submit(
-          dict:to_list(update_basic(get_stats(Data))),
+          lists:map(fun ({_, V}) -> V end, dict:to_list(update_basic(get_stats(Data)))),
           ecs_util:randomize(get_forwarders(Data)))
     of
         ok -> reset_stats(clear_stats(Data));
