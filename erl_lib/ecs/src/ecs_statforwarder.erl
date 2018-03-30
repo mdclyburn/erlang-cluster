@@ -39,7 +39,7 @@ init(_) ->
             {ok, create_data(ForwardingInfo)};
         none ->
             io:format("No data will be forwarded.~n"),
-            {ok, nil}
+            {ok, create_data(nil)}
     end.
 
 terminate(Reason, _) -> io:format("Statistics forwarder stopping: ~w.~n", [Reason]).
