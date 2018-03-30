@@ -101,4 +101,6 @@ forward_data(Stats, {influx, Uri, Authorization}) ->
         ok -> ok;
         {error, 401} -> {error, {permanent, "bad authentication credentials"}};
         {error, Info} -> {error, {transient, io_lib:format("~w", [Info])}}
-    end.
+    end;
+% Dump data.
+forward_data(_, nil) -> ok.
