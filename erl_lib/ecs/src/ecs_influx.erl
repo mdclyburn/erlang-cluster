@@ -7,8 +7,14 @@
 
 % Sends measurements to the 'ecs' database.
 % Returns ok upon success, {error, _} upon failure.
+-spec write(Stats, Uri, AuthorizationToken) -> Result when
+      Stats :: [stat()],
+      Uri :: string(),
+      AuthorizationToken :: string(),
+      Result :: {ok | error, term()}.
+
 write([], _, _) -> ok;
-write(Stats, Uri, Authorization) when is_list(Stats) ->
+write(Stats, Uri, Authorization) ->
     case
         httpc:request(
           post,
