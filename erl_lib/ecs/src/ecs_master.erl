@@ -21,21 +21,20 @@ init(_) ->
           type => worker,
           modules => [ecs_config_manager]},
 
-        #{id => statistics,
-          start => {ecs_statistics, start_link, []},
+        #{id => statforwarder,
+          start => {ecs_statforwarder, start_link, []},
           restart => permanent,
           shutdown => 5000,
           type => worker,
-          modules => [ecs_statistics]},
+          modules => [ecs_statforwarder]},
 
-        #{id => connectivity,
-          start => {ecs_connectivity, start_link, []},
+        #{id => statistics,
+          start => {ecs_statistics, start_link, []},
           restart => permanent,
-          shutdown => 500,
+          shutdown => 3000,
           type => worker,
-          modules => [ecs_connectivity]}
+          modules => [ecs_statistics]}
        ]
-       ++ configured_roles(ecs_config:roles(erlang:list_to_atom(ecs_util:host())))
      }}.
 
 configured_roles(Roles) -> configured_roles(Roles, []).

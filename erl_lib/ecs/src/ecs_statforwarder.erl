@@ -18,15 +18,7 @@ start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 submit([], _) -> ok;
 submit(_, []) -> {error, no_forwarder};
-submit(Stats, [Forwarder|Rest]) when is_list(Stats) ->
-    try
-        case Forwarder == ecs_util:host_a() of
-            true -> gen_server:call(?MODULE, {add, Stats});
-            false -> gen_server:call({?MODULE, Forwarder}, {add, Stats})
-        end
-    catch
-        exit:_ -> submit(Stats, Rest)
-    end.
+submit(Stats, [Forwarder|Rest]) when is_list(Stats) -> gen_server:call(?MODULE, {add, Stats}).
 
 % ===== gen_server
 

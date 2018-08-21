@@ -46,17 +46,10 @@ code_change(_, Data, _) -> {ok, Data}.
 % ===== Private
 
 % Initialize internal data.
-create_data() -> create_data(
-                   lists:map(fun (Host) ->
-                                     erlang:list_to_atom(ecs_util:name()
-                                                         ++ "@"
-                                                         ++ erlang:atom_to_list(Host)) end,
-                             ecs_config:nodes_of_role(stat_forward))).
-create_data(Forwarders) ->
-    case lists:member(stat_forward, ecs_config:roles(ecs_util:host_a())) of
-        true -> {add_basic(dict:new()), [erlang:node()], setup_timer()};
-        false -> {add_basic(dict:new()), Forwarders, setup_timer()}
-    end.
+create_data() ->
+    {add_basic(dict:new()),
+     [erlang:node()],
+     setup_timer()}.
 
 get_forwarders({_, F, _}) -> F.
 
@@ -100,7 +93,8 @@ add_basic(Stats) ->
     add_basic(Stats,
               ["process_count",
                "memory_atom",
-               "memory_atom_used"]).
+               "memory_atom_used",
+               "atom_count"]).
 
 add_basic(Stats, []) -> Stats;
 add_basic(Stats, [Id|Rest]) ->
@@ -111,7 +105,8 @@ update_basic(Stats) ->
     update_basic(Stats,
               [{"process_count", erlang:length(erlang:processes())},
                {"memory_atom", erlang:memory(atom)},
-               {"memory_atom_used", erlang:memory(atom_used)}]).
+               {"memory_atom_used", erlang:memory(atom_used)},
+               {"atom_count", erlang:system_info(atom_count)}]).
 update_basic(Stats, []) -> Stats;
 update_basic(Stats, [{Id, Value}|Rest]) ->
     update_basic(dict:update(Id, fun (Stat) -> ecs_stat:update(Value, Stat) end, Stats), Rest).

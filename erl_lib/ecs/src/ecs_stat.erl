@@ -28,7 +28,7 @@ new(Name, Value, Tags, Opts) ->
        value = Value,
        tags = Tags,
        time = erlang:system_time(),
-       origin = erlang:node(),
+       origin = get_host_name(),
        options = maps:from_list(Opts)}.
 
 -spec set_opts(Stat, Options) -> Stat when
@@ -79,3 +79,12 @@ reset(Stat) ->
       IsContinuous :: boolean().
 
 continuous(Stat) -> maps:get(continuous, Stat#stat.options, true).
+
+-spec get_host_name() -> HostName when
+      HostName :: string().
+
+get_host_name() ->
+    case application:get_env(host) of
+        undefined -> "unknown";
+        {ok, Name} -> Name
+    end.

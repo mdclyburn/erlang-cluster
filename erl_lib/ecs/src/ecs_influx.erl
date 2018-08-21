@@ -18,7 +18,7 @@ write(Stats, Uri, Authorization) ->
     case
         httpc:request(
           post,
-          {Uri ++ "/write?db=ecs",
+          {Uri ++ "/write?db=ews",
            [{"Authorization", "Basic " ++ Authorization}],
            "text/plain",
            lists:flatten(lists:join(io_lib:nl(), lists:map(fun (S) -> measurement_to_string(translate(S)) end, Stats)))},
@@ -60,10 +60,9 @@ add_tag(Name, Value, {MeasurementName, MeasurementValue, Time, Tags})
     {MeasurementName, MeasurementValue, Time, [{Name, Value}|Tags]}.
 
 % Add information to identify the node measurements are taken from.
-get_basic_tags(Origin) when is_atom(Origin) ->
-    [{"node_name", ecs_util:name(Origin)},
-     {"node_host", ecs_util:host(Origin)},
-     {"node", erlang:atom_to_list(Origin)}].
+get_basic_tags(Origin) when is_list(Origin) ->
+    [{"host", Origin}].
+
 
 add_tags(Measurement, []) -> Measurement;
 add_tags(Measurement, [{N, V}|Rest]) -> add_tags(add_tag(N, V, Measurement), Rest).
